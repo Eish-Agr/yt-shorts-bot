@@ -1,0 +1,63 @@
+# ============================================================
+# YouTube Shorts Automation Bot - Requirements
+# ============================================================
+
+# --- Core framework ---
+python-dotenv==1.0.0
+requests==2.31.0
+aiohttp==3.9.1
+httpx==0.25.2
+schedule==1.2.1
+apscheduler==3.10.4
+
+# --- Trend discovery ---
+pytrends==4.9.2          # Google Trends
+praw==7.7.1              # Reddit API
+feedparser==6.0.10       # RSS feeds
+
+# --- Database ---
+sqlalchemy==2.0.25
+alembic==1.13.1
+# sqlite3 is built-in
+
+# --- Script generation (local LLM) ---
+ollama==0.1.7            # Ollama Python client
+
+# --- Voice synthesis ---
+# Piper TTS: installed via binary, no pip package needed
+# Kokoro: pip install kokoro-onnx
+kokoro-onnx==0.3.2
+soundfile==0.12.1
+numpy==1.26.3
+
+# --- Image / Visual generation ---
+Pillow==10.2.0
+requests==2.31.0         # for Lexica / Unsplash API
+stability-sdk==0.8.4     # Stable Diffusion (free tier)
+
+# --- Video generation ---
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+imageio==2.33.1
+imageio-ffmpeg==0.4.9
+
+# --- Thumbnail ---
+Pillow==10.2.0
+# fonts handled via system fonts
+
+# --- YouTube upload ---
+google-api-python-client==2.115.0
+google-auth==2.27.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+
+# --- Monitoring & logging ---
+loguru==0.7.2
+tenacity==8.2.3          # retry logic
+rich==13.7.0             # pretty console output
+
+# --- Utilities ---
+python-slugify==8.0.1
+pydantic==2.5.3
+click==8.1.7             # CLI interface
+tqdm==4.66.1             # progress bars

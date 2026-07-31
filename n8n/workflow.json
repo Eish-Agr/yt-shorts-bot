@@ -1,0 +1,184 @@
+{
+  "name": "YouTube Shorts Automation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "notes": "Runs every 6 hours. Adjust interval in .env SCHEDULE_HOURS"
+    },
+    {
+      "parameters": {
+        "command": "cd /app && python main.py --dry-run 2>&1 | tail -30"
+      },
+      "id": "n2",
+      "name": "Run Trend Discovery",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [460, 300],
+      "notes": "Runs trend discovery and topic ranking. Returns scored topics."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.stdout }}", "operation": "contains", "value2": "Selected topic" }]
+        }
+      },
+      "id": "n3",
+      "name": "Topic Found?",
+      "type": "n8n-nodes-base.if",
+      "position": [680, 300],
+      "notes": "Checks if a valid topic was discovered. Stops run if nothing found."
+    },
+    {
+      "parameters": {
+        "command": "cd /app && python main.py 2>&1 | tail -50"
+      },
+      "id": "n4",
+      "name": "Run Full Pipeline",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [900, 220],
+      "notes": "Runs the complete pipeline: script → voice → visuals → video → upload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.stdout }}", "operation": "contains", "value2": "youtu.be" }]
+        }
+      },
+      "id": "n5",
+      "name": "Upload Success?",
+      "type": "n8n-nodes-base.if",
+      "position": [1120, 220],
+      "notes": "Checks if the video was successfully uploaded to YouTube."
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.DISCORD_WEBHOOK }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=✅ New Short uploaded! {{ $json.stdout.match(/youtu.be\\/[^\\s]+/)?.[0] || '' }}"
+            }
+          ]
+        }
+      },
+      "id": "n6",
+      "name": "Discord Success Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1340, 160],
+      "notes": "Sends Discord notification on successful upload. Set DISCORD_WEBHOOK in .env"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.DISCORD_WEBHOOK }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=❌ Pipeline FAILED. Check logs: {{ $json.stdout.slice(-300) }}"
+            }
+          ]
+        }
+      },
+      "id": "n7",
+      "name": "Discord Error Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1340, 320],
+      "notes": "Sends Discord notification on failure. Review the logs directory."
+    },
+    {
+      "parameters": {
+        "command": "cd /app && python -c \"from src.monitoring.logger import get_pipeline_summary; from src.database import init_db, get_session; s = get_pipeline_summary(get_session(init_db())); import json; print(json.dumps(s, indent=2))\""
+      },
+      "id": "n8",
+      "name": "No Topic - Log Skip",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [900, 380],
+      "notes": "Logs a skip event when no new topic is available. No action needed."
+    },
+    {
+      "parameters": {
+        "command": "cd /app && python -c \"\nfrom src.database import init_db, get_session\nfrom src.growth.optimizer import PerformanceTracker\nfrom src.upload.youtube import YouTubeUploader\ndb = get_session(init_db())\ntracker = PerformanceTracker()\nuploader = YouTubeUploader()\nupdated = tracker.fetch_and_save(db, uploader)\nprint(f'Updated analytics for {updated} videos')\n\""
+      },
+      "id": "n9",
+      "name": "Fetch Analytics (Daily)",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [460, 520],
+      "notes": "Fetches YouTube analytics once per day for all uploaded videos."
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 24 }] }
+      },
+      "id": "n10",
+      "name": "Daily Analytics Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 520],
+      "notes": "Runs once per day to pull YouTube performance data."
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Run Trend Discovery", "type": "main", "index": 0 }]]
+    },
+    "Run Trend Discovery": {
+      "main": [[{ "node": "Topic Found?", "type": "main", "index": 0 }]]
+    },
+    "Topic Found?": {
+      "main": [
+        [{ "node": "Run Full Pipeline",  "type": "main", "index": 0 }],
+        [{ "node": "No Topic - Log Skip","type": "main", "index": 0 }]
+      ]
+    },
+    "Run Full Pipeline": {
+      "main": [[{ "node": "Upload Success?", "type": "main", "index": 0 }]]
+    },
+    "Upload Success?": {
+      "main": [
+        [{ "node": "Discord Success Alert", "type": "main", "index": 0 }],
+        [{ "node": "Discord Error Alert",   "type": "main", "index": 0 }]
+      ]
+    },
+    "Daily Analytics Trigger": {
+      "main": [[{ "node": "Fetch Analytics (Daily)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 2,
+  "tags": [{ "name": "youtube-shorts-bot" }],
+
+  "_setup_instructions": {
+    "step1": "Install n8n: npm install -g n8n",
+    "step2": "Start n8n: n8n start --tunnel",
+    "step3": "Open http://localhost:5678",
+    "step4": "Import this file: Settings → Import workflow → select this JSON",
+    "step5": "Set environment variable DISCORD_WEBHOOK in n8n settings if you want alerts",
+    "step6": "Activate the workflow with the toggle in the top right",
+    "note":  "The Execute Command nodes assume /app is your project root. Adjust the path."
+  }
+}

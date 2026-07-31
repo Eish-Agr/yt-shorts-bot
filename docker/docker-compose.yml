@@ -1,0 +1,83 @@
+# ============================================================
+# docker-compose.yml — Full stack: Bot + Ollama LLM + n8n
+# Usage:
+#   docker compose up -d          # start all
+#   docker compose logs -f bot    # follow bot logs
+#   docker compose down           # stop all
+# ============================================================
+version: "3.9"
+
+services:
+
+  # ── Main Shorts Bot ────────────────────────────────────────
+  bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: yt_shorts_bot
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - DB_PATH=/app/data/bot.db
+    volumes:
+      - ../output:/app/output       # produced videos / thumbnails
+      - ../data:/app/data           # SQLite database
+      - ../logs:/app/logs           # log files
+      - ../config:/app/config       # client_secrets.json + token
+      - ../assets:/app/assets       # fonts, music
+    depends_on:
+      - ollama
+    networks:
+      - bot_net
+
+  # ── Ollama — Local LLM for script generation ──────────────
+  # CPU-only by default. For GPU: uncomment deploy section.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - bot_net
+    # ---- GPU support (NVIDIA) — uncomment if you have a GPU ----
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── n8n — Visual workflow orchestrator (optional) ─────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=changeme123
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../n8n:/workflows          # workflow JSON files
+    networks:
+      - bot_net
+
+volumes:
+  ollama_models:
+  n8n_data:
+
+networks:
+  bot_net:
+    driver: bridge
