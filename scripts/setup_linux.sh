@@ -50,9 +50,9 @@ ok "Directories created"
 step "5/7" "Downloading Piper TTS"
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_linux_x86_64.tar.gz"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz"
 elif [ "$ARCH" = "aarch64" ]; then
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_linux_aarch64.tar.gz"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_arm64.tar.gz"
 else
     warn "Unknown arch $ARCH — skipping Piper download. Kokoro will be used as fallback."
     PIPER_URL=""

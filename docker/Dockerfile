@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ── Download Piper TTS ───────────────────────────────────────
 RUN mkdir -p /app/tools/piper/models && \
     wget -q -O /tmp/piper.tar.gz \
-    "https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_linux_x86_64.tar.gz" && \
+    "https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz" && \
     tar -xzf /tmp/piper.tar.gz -C /app/tools/piper --strip-components=1 && \
     rm /tmp/piper.tar.gz && \
     chmod +x /app/tools/piper/piper
