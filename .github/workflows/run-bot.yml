@@ -1,0 +1,105 @@
+# .github/workflows/run-bot.yml
+#
+# Runs the yt-shorts-bot pipeline on a schedule using GitHub's free
+# Actions minutes. Builds the repo's own docker/Dockerfile (which already
+# resolves Piper TTS to the correct Linux binary + model + font — the
+# tools/piper/piper.exe committed in the repo is Windows-only and is not
+# used here), runs one pipeline pass, then commits the updated
+# data/bot.db back so topic dedup/cooldown state survives between runs.
+#
+# Requires these repository secrets (Settings → Secrets and variables → Actions):
+#   YT_CLIENT_SECRETS_JSON   full contents of config/client_secrets.json
+#   YT_TOKEN_JSON            full contents of config/youtube_token.json
+#   PIXABAY_API_KEY
+#   PEXELS_API_KEY
+#   UNSPLASH_ACCESS_KEY
+#   GNEWS_API_KEY
+#   YOUTUBE_API_KEY
+#   REDDIT_CLIENT_ID         optional — leave unset until it's a real value
+#   REDDIT_CLIENT_SECRET     optional — leave unset until it's a real value
+#
+# Requires Settings → Actions → General → Workflow permissions →
+# "Read and write permissions" (so the commit-back step can push).
+
+name: shorts-bot
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # 00:00, 06:00, 12:00, 18:00 UTC — matches SCHEDULE_HOURS=6
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip the YouTube upload)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build bot image (layer-cached across runs)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: yt-shorts-bot:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Write YouTube credentials from secrets
+        env:
+          YT_CLIENT_SECRETS_JSON: ${{ secrets.YT_CLIENT_SECRETS_JSON }}
+          YT_TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
+        run: |
+          mkdir -p config
+          printf '%s' "$YT_CLIENT_SECRETS_JSON" > config/client_secrets.json
+          printf '%s' "$YT_TOKEN_JSON" > config/youtube_token.json
+
+      - name: Run one pipeline pass
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          mkdir -p output logs
+
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="--dry-run"
+          fi
+
+          docker run --rm \
+            -v "$PWD/output:/app/output" \
+            -v "$PWD/data:/app/data" \
+            -v "$PWD/logs:/app/logs" \
+            -v "$PWD/config:/app/config" \
+            -e REDDIT_CLIENT_ID \
+            -e REDDIT_CLIENT_SECRET \
+            -e PIXABAY_API_KEY \
+            -e PEXELS_API_KEY \
+            -e UNSPLASH_ACCESS_KEY \
+            -e GNEWS_API_KEY \
+            -e YOUTUBE_API_KEY \
+            -e YT_PRIVACY=unlisted \
+            yt-shorts-bot:latest python main.py $ARGS
+
+      - name: Persist updated state back to the repo
+        run: |
+          git config user.name "yt-shorts-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/bot.db
+          git diff --cached --quiet || git commit -m "chore: bot state after run ${{ github.run_id }} [skip ci]"
+          git push
