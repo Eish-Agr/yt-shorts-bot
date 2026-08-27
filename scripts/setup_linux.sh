@@ -82,7 +82,7 @@ fi
 # ── Font ──────────────────────────────────────────────────────
 if [ ! -f "assets/fonts/Montserrat-Bold.ttf" ]; then
     wget -q -O assets/fonts/Montserrat-Bold.ttf \
-        "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf"
+        "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Bold.ttf"
     ok "Font downloaded"
 else
     ok "Font already present"
