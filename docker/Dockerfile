@@ -49,7 +49,7 @@ RUN wget -q -O /app/tools/piper/models/en_US-amy-medium.onnx \
 # ── Download font ────────────────────────────────────────────
 RUN mkdir -p /app/assets/fonts && \
     wget -q -O /app/assets/fonts/Montserrat-Bold.ttf \
-    "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Bold.ttf"
+    "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf"
 
 # ── Create output directories ────────────────────────────────
 RUN mkdir -p \
