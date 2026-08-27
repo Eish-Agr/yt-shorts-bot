@@ -93,7 +93,7 @@ jobs:
             -e UNSPLASH_ACCESS_KEY \
             -e GNEWS_API_KEY \
             -e YOUTUBE_API_KEY \
-            -e YT_PRIVACY=unlisted \
+            -e YT_PRIVACY=public \
             yt-shorts-bot:latest python main.py $ARGS
 
       - name: Persist updated state back to the repo
